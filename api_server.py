@@ -4,29 +4,46 @@ from pydantic import BaseModel
 import aiohttp
 import asyncio
 import os
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Data Validator Agent", description="AI agent that validates data for other AI agents", version="1.0.0")
+# Lifespan handler for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create a reusable session
+    app.state.session = aiohttp.ClientSession()
+    # Optional: semaphore to limit concurrent requests to OpenRouter
+    app.state.semaphore = asyncio.Semaphore(100)  # max 100 concurrent outgoing requests
+    yield
+    # Shutdown: close the session
+    await app.state.session.close()
 
-# Request body ka format define karo
+app = FastAPI(
+    title="Data Validator Agent",
+    description="AI agent that validates data for other AI agents",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Request/Response models
 class DataRequest(BaseModel):
-    data: str  # User jo data check karwana chahta hai
+    data: str
 
-# Response body ka format
 class DataResponse(BaseModel):
-    result: str  # Agent ka jawab
-    price: float  # Kitne paise lagay
+    result: str
+    price: float
 
-# OpenRouter API key environment variable se lo (secure rakho)
+# Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
-PRICE_PER_REQUEST = 0.01  # $0.01 per request
+PRICE_PER_REQUEST = 0.01
+TIMEOUT_SECONDS = 30  # Timeout for each OpenRouter call
 
 async def check_data(data: str) -> str:
-    """Tera original agent ka logic yahan copy karo"""
+    """Use shared session to call OpenRouter API"""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://yourapp.com",  # Apni website dalo
+        "HTTP-Referer": "https://yourapp.com",
         "X-Title": "Data Validator Agent"
     }
     
@@ -43,13 +60,21 @@ async def check_data(data: str) -> str:
         "temperature": 0.1
     }
     
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=payload) as resp:
-            if resp.status != 200:
-                text = await resp.text()
-                raise Exception(f"OpenRouter Error: {resp.status}: {text}")
-            result = await resp.json()
-            return result['choices'][0]['message']['content']
+    # Use semaphore to limit concurrent requests if needed
+    async with app.state.semaphore:
+        try:
+            async with app.state.session.post(
+                url, headers=headers, json=payload, timeout=TIMEOUT_SECONDS
+            ) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise Exception(f"OpenRouter Error: {resp.status}: {text}")
+                result_json = await resp.json()
+                return result_json['choices'][0]['message']['content']
+        except asyncio.TimeoutError:
+            raise Exception("OpenRouter request timed out")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Network error: {str(e)}")
 
 @app.get("/")
 def home():
@@ -61,16 +86,13 @@ def health():
 
 @app.post("/check", response_model=DataResponse)
 async def check_data_endpoint(request: DataRequest):
-    """
-    Yeh main API endpoint hai. Yahan POST request bhejni hai data ke saath.
-    """
     try:
         result = await check_data(request.data)
         return DataResponse(result=result, price=PRICE_PER_REQUEST)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Local run karne ke liye (terminal mein: uvicorn api_server:app --reload)
+# For local run
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
