@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Validator Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        header { text-align: center; margin-bottom: 60px; }
+        h1 { font-size: 3.5em; margin-bottom: 20px; }
+        .subtitle { font-size: 1.3em; opacity: 0.9; }
+        .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 30px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.2); }
+        .price-badge { background: #ffd700; color: #333; padding: 10px 20px; border-radius: 50px; display: inline-block; font-weight: bold; margin: 20px 0; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 40px 0; }
+        .feature { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; text-align: center; }
+        .feature h3 { margin-bottom: 10px; }
+        .btn { background: white; color: #667eea; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 20px; transition: transform 0.3s; }
+        .btn:hover { transform: translateY(-2px); }
+        .example { background: #1a1a1a; padding: 20px; border-radius: 10px; font-family: monospace; }
+        .example pre { margin: 0; color: #00ff00; }
+        .try { text-align: center; margin-top: 50px; }
+        footer { text-align: center; margin-top: 60px; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Data Validator Agent</h1>
+            <div class="subtitle">AI-powered data validation for other AI agents</div>
+            <div class="price-badge">$0.10 per request</div>
+        </header>
+
+        <div class="card">
+            <h2>What does it do?</h2>
+            <p>Your AI agent makes mistakes? Let our agent validate data before responding. Perfect for:</p>
+            <div class="features">
+                <div class="feature">
+                    <h3>✅ Fact Checking</h3>
+                    <p>Verify statements against real-world knowledge</p>
+                </div>
+                <div class="feature">
+                    <h3>🧠 Logical Errors</h3>
+                    <p>Detect contradictions and inconsistencies</p>
+                </div>
+                <div class="feature">
+                    <h3>🚫 Hallucination Prevention</h3>
+                    <p>Stop AI from making up false information</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Quick Example</h2>
+            <div class="example">
+                <pre>
+> POST /check
+> {"data": "Bitcoin price is $100,000"}
+
+< {
+<   "result": "WRONG: Bitcoin is currently trading around $50,000, not $100,000.",
+<   "price": 0.10
+< }
+                </pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>API Endpoints</h2>
+            <ul style="margin-left: 20px;">
+                <li><strong>POST /check</strong> - Validate any data statement</li>
+                <li><strong>GET /health</strong> - Check if API is alive</li>
+                <li><strong>GET /docs</strong> - Interactive Swagger documentation</li>
+                <li><strong>GET /redoc</strong> - Alternative documentation</li>
+            </ul>
+        </div>
+
+        <div class="try">
+            <a href="/docs" class="btn">🚀 Try it Now</a>
+            <a href="/redoc" class="btn" style="background: transparent; border: 2px solid white; color: white;">📚 ReDoc</a>
+        </div>
+
+        <footer>
+            © 2026 Data Validator Agent | Built for the AI-to-AI economy | Price: $0.10/request
+        </footer>
+    </div>
+</body>
+</html>
