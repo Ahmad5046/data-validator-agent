@@ -1,7 +1,7 @@
 """
 Complete Data Validator Agent API
 Price: $0.10 per request
-Includes: OpenAPI spec, Terms, Skyfire webhook
+Includes: Landing page, OpenAPI spec, Terms, Health check
 """
 
 import os
@@ -48,7 +48,9 @@ app = FastAPI(
     title="Data Validator Agent",
     description="AI agent that validates data for other AI agents. $0.10 per request.",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs",      # Swagger UI
+    redoc_url="/redoc",    # ReDoc (alternative docs)
 )
 
 # ---------- Pydantic Models ----------
@@ -65,7 +67,7 @@ async def check_data(data: str) -> str:
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": os.getenv("APP_URL", "https://your-app.com"),
+        "HTTP-Referer": os.getenv("APP_URL", "https://data-validator-agent.up.railway.app"),
         "X-Title": "Data Validator Agent"
     }
     prompt = f"""You are an expert data checker agent. Your task is to verify the given data.
@@ -84,6 +86,8 @@ Reply only with "CORRECT" or "WRONG: describe the error"."""
                 if resp.status != 200:
                     text = await resp.text()
                     logger.error(f"OpenRouter error {resp.status}: {text[:200]}")
+                    if resp.status == 401:
+                        raise HTTPException(status_code=502, detail="OpenRouter API key invalid or disabled")
                     raise HTTPException(status_code=502, detail="AI service error")
                 result = await resp.json()
                 return result['choices'][0]['message']['content'].strip()
@@ -94,20 +98,37 @@ Reply only with "CORRECT" or "WRONG: describe the error"."""
             logger.error(f"Network error: {str(e)}")
             raise HTTPException(status_code=503, detail="AI service unavailable")
 
-# ---------- API Endpoints ----------
-@app.get("/", include_in_schema=False)
-async def root():
-    return {"message": "Data Validator Agent is running!", "price_per_request": f"${PRICE_PER_REQUEST}"}
+# ---------- Landing Page (Custom HTML) ----------
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def home():
+    """Custom landing page for the agent"""
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        # Fallback if index.html not found
+        return """
+        <html>
+            <body>
+                <h1>Data Validator Agent</h1>
+                <p>API is running. Visit <a href="/docs">/docs</a> for documentation.</p>
+                <p>Price: $0.10 per request</p>
+            </body>
+        </html>
+        """
 
+# ---------- API Endpoints ----------
 @app.get("/health", include_in_schema=False)
 async def health():
-    return {"status": "healthy"}
+    """Health check endpoint"""
+    return {"status": "healthy", "price": PRICE_PER_REQUEST}
 
 @app.post("/check", response_model=DataResponse)
 async def check_data_endpoint(request: DataRequest):
     """Validate the provided data."""
     try:
         result = await check_data(request.data)
+        logger.info(f"Request: {request.data[:50]}... Result: {result[:50]}...")
         return DataResponse(result=result, price=PRICE_PER_REQUEST)
     except HTTPException:
         raise
@@ -115,7 +136,7 @@ async def check_data_endpoint(request: DataRequest):
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# ---------- OpenAPI JSON (explicit) ----------
+# ---------- OpenAPI JSON ----------
 @app.get("/openapi.json", include_in_schema=False)
 async def get_openapi_json():
     """Return OpenAPI specification in JSON format."""
@@ -144,7 +165,7 @@ TERMS_HTML = """
     <p>Data Validator Agent provides AI-powered data validation services. It checks facts, logical errors, and misinformation for other AI agents and applications.</p>
     
     <h2>2. Pricing</h2>
-    <p>$0.10 per successful request. Payments are processed through Skyfire protocol.</p>
+    <p>$0.10 per successful request. Payments are processed through Skyfire protocol or RapidAPI.</p>
     
     <h2>3. Usage</h2>
     <p>This service is intended for AI agents and developers. You agree not to misuse the API or attempt to reverse-engineer it.</p>
@@ -168,8 +189,6 @@ async def skyfire_webhook(request: Request):
     """Receive payment notifications from Skyfire."""
     payload = await request.json()
     logger.info(f"Skyfire webhook received: {payload}")
-    # Verify signature if needed, then process payment
-    # For now, just acknowledge
     return {"status": "received"}
 
 # ---------- Run (for local development) ----------
