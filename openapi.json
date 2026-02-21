@@ -1,0 +1,89 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Data Validator Agent",
+    "description": "AI agent that validates data for other AI agents. Checks facts, logical errors, and misinformation. Crucial for hallucination prevention.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://data-validator-agent.up.railway.app"
+    }
+  ],
+  "paths": {
+    "/check": {
+      "post": {
+        "summary": "Validate data",
+        "description": "Send data to be validated. Returns CORRECT or WRONG with explanation.",
+        "operationId": "validateData",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "The data statement to validate",
+                    "example": "Bitcoin price is $100,000"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "description": "CORRECT or WRONG with explanation"
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Cost in USD",
+                      "example": 0.10
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
