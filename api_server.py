@@ -1,7 +1,7 @@
 """
 Complete Data Validator Agent API
-Price: $0.10 per request
-Includes: Landing page, OpenAPI spec, Terms, Health check
+Price: $0.10 per request (handled by RapidAPI)
+Response: Only validation result, no price field
 """
 
 import os
@@ -24,7 +24,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 if not OPENROUTER_API_KEY:
     raise ValueError("❌ OPENROUTER_API_KEY not set in environment variables")
 
-PRICE_PER_REQUEST = 0.10  # $0.10 per request (premium pricing)
+PRICE_PER_REQUEST = 0.10  # $0.10 per request (for internal use only, not shown in response)
 TIMEOUT_SECONDS = 30
 
 # ---------- Logging ----------
@@ -49,8 +49,8 @@ app = FastAPI(
     description="AI agent that validates data for other AI agents. $0.10 per request.",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",      # Swagger UI
-    redoc_url="/redoc",    # ReDoc (alternative docs)
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # ---------- Pydantic Models ----------
@@ -59,7 +59,7 @@ class DataRequest(BaseModel):
 
 class DataResponse(BaseModel):
     result: str = Field(..., description="Validation result (CORRECT or WRONG with explanation)")
-    price: float = Field(..., description="Cost in USD")
+    # price field removed - RapidAPI handles pricing
 
 # ---------- Helper: Call OpenRouter ----------
 async def check_data(data: str) -> str:
@@ -106,7 +106,6 @@ async def home():
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        # Fallback if index.html not found
         return """
         <html>
             <body>
@@ -121,7 +120,7 @@ async def home():
 @app.get("/health", include_in_schema=False)
 async def health():
     """Health check endpoint"""
-    return {"status": "healthy", "price": PRICE_PER_REQUEST}
+    return {"status": "healthy"}
 
 @app.post("/check", response_model=DataResponse)
 async def check_data_endpoint(request: DataRequest):
@@ -129,7 +128,8 @@ async def check_data_endpoint(request: DataRequest):
     try:
         result = await check_data(request.data)
         logger.info(f"Request: {request.data[:50]}... Result: {result[:50]}...")
-        return DataResponse(result=result, price=PRICE_PER_REQUEST)
+        # Price field removed - only result returned
+        return DataResponse(result=result)
     except HTTPException:
         raise
     except Exception as e:
@@ -165,7 +165,7 @@ TERMS_HTML = """
     <p>Data Validator Agent provides AI-powered data validation services. It checks facts, logical errors, and misinformation for other AI agents and applications.</p>
     
     <h2>2. Pricing</h2>
-    <p>$0.10 per successful request. Payments are processed through Skyfire protocol or RapidAPI.</p>
+    <p>$0.10 per successful request. Payments are processed through RapidAPI.</p>
     
     <h2>3. Usage</h2>
     <p>This service is intended for AI agents and developers. You agree not to misuse the API or attempt to reverse-engineer it.</p>
@@ -182,14 +182,6 @@ TERMS_HTML = """
 @app.get("/terms", response_class=HTMLResponse, include_in_schema=False)
 async def terms():
     return TERMS_HTML
-
-# ---------- Skyfire Webhook (optional) ----------
-@app.post("/skyfire-webhook", include_in_schema=False)
-async def skyfire_webhook(request: Request):
-    """Receive payment notifications from Skyfire."""
-    payload = await request.json()
-    logger.info(f"Skyfire webhook received: {payload}")
-    return {"status": "received"}
 
 # ---------- Run (for local development) ----------
 if __name__ == "__main__":
