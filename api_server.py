@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -70,16 +70,23 @@ async def check_data(data: str) -> str:
         "HTTP-Referer": os.getenv("APP_URL", "https://data-validator-agent.up.railway.app"),
         "X-Title": "Data Validator Agent"
     }
-    prompt = f"""You are an expert data checker agent. Your task is to verify the given data.
-Data: {data}
-Is this data correct? If not, what is the error?
-Reply only with "CORRECT" or "WRONG: describe the error"."""
+    
+    # 🔥 FIXED PROMPT - More precise and focused
+    prompt = f"""You are an expert fact-checker. Verify the given statement for factual accuracy ONLY.
+Do NOT add extra information, context, or related facts unless directly relevant to verifying the statement.
+If the statement is accurate, reply with "CORRECT".
+If it is inaccurate, reply with "WRONG: [specific error]".
+Keep your answer concise and limited to the statement itself.
+
+Statement: {data}"""
+    
     payload = {
         "model": "mistralai/mixtral-8x7b-instruct",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
-        "max_tokens": 200
+        "max_tokens": 150  # Reduced tokens to save credits
     }
+    
     async with app.state.semaphore:
         try:
             async with app.state.session.post(url, headers=headers, json=payload, timeout=TIMEOUT_SECONDS) as resp:
@@ -88,6 +95,8 @@ Reply only with "CORRECT" or "WRONG: describe the error"."""
                     logger.error(f"OpenRouter error {resp.status}: {text[:200]}")
                     if resp.status == 401:
                         raise HTTPException(status_code=502, detail="OpenRouter API key invalid or disabled")
+                    if resp.status == 402:
+                        raise HTTPException(status_code=402, detail="Insufficient credits. Please add funds to OpenRouter.")
                     raise HTTPException(status_code=502, detail="AI service error")
                 result = await resp.json()
                 return result['choices'][0]['message']['content'].strip()
@@ -128,7 +137,6 @@ async def check_data_endpoint(request: DataRequest):
     try:
         result = await check_data(request.data)
         logger.info(f"Request: {request.data[:50]}... Result: {result[:50]}...")
-        # Price field removed - only result returned
         return DataResponse(result=result)
     except HTTPException:
         raise
